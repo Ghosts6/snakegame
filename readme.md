@@ -7,485 +7,326 @@ This source code of snake game that i write with language like c,c++ and python:
 ```c
 #include <stdio.h>
 #include <stdlib.h>
-#include <conio.h>
+#include <unistd.h>
 #include <time.h>
+#include <ncurses.h>
 #include <ctype.h>
-#include <windows.h>
-#include <process.h>
 
-//define
-#define up 72
-#define down 80
-#define left 75
-#define right 77
-//global variables
-int length,bend_no,len,life,
-//functions
-void record();
-void load();
-void delay(long double);
-void move();
-void food();
-void print();
-void gotoxy(int x,int y);
-void gotoXY(int x,int y);
-void bend();
-void boarder();
-void down();
-void up();
-void left();
-void right();
-void exitgame();
-int score();
-int scoreonly();
-//struct for direction
-struct coordinate{
-    int x,y,direction;
+// Define key codes
+#define UP_KEY 65
+#define DOWN_KEY 66
+#define RIGHT_KEY 67
+#define LEFT_KEY 68
+#define W_KEY 119
+#define A_KEY 97
+#define S_KEY 115
+#define D_KEY 100
+#define ESC_KEY 27
+
+// Define constants
+#define SNAKE_SIZE 5 
+#define FOOD_SIZE 3
+#define SPECIAL_FOOD_SIZE 4
+
+// Struct for direction
+struct coordinate {
+    int x, y;
 };
 
 typedef struct coordinate coordinate;
-coordinate head,bend[500],food,body[30];
-// main def
-int main(){
-    char key;
-    print();
-    system("cls");
 
-    load();
+coordinate head, food, specialFood, body[SNAKE_SIZE * 10];
+int length, life, score, specialFoodTimer;
+int directionX, directionY;
 
-    length=5;
-    head.x=25;
-    head.y=20;
-    head.direction=right;
 
-    boarder();
+void setup();
+void draw();
+void input();
+void logic();
+void generateFood();
+void generateSpecialFood();
+void gameover();
+void record();
+void showTopRecords();
 
-    food();
+int main() {
+    setup();
 
-    life=3;
+    while (1) {
+        draw();
+        input();
+        logic();
+        usleep(100000); 
+    }
 
-    bend[0]=head;
-
-    move();
-
+    endwin(); 
     return 0;
 }
 
-void move(){
-    int a,i;
-    do{
-        food();
-        fflush(stdin);
-        len=0;
-        for(int i=0;i<30;i++){
-            body[i].x=0;body[i].y=0;
-            if(i==length){
-                break;
+void setup() {
+    initscr();            
+    keypad(stdscr, TRUE); 
+    nodelay(stdscr, TRUE); 
+    noecho();             
+    curs_set(0);         
+
+    length = SNAKE_SIZE;
+    head.x = 10;
+    head.y = 10;
+    for (int i = 0; i < SNAKE_SIZE; i++) {
+        body[i].x = head.x - i;
+        body[i].y = head.y;
+    }
+
+    generateFood();
+    generateSpecialFood();
+    specialFoodTimer = 0;
+
+    life = 3;
+    score = 0;
+
+    directionX = 1; // 
+    directionY = 0;
+
+
+    printf("Game setup complete!\n");
+}
+
+void draw() {
+    clear();
+
+
+    for (int i = 0; i < COLS; i++) {
+        for (int j = 0; j < LINES; j++) {
+            if (i == 0 || i == COLS - 1 || j == 0 || j == LINES - 1) {
+                mvprintw(j, i, "-");
             }
         }
-        delay(length);
-        boarder();
-        if(head.direction==right){
-            right();
-        }else if(head.direction==left){
-            left();
-        }else if(head.direction==down){
-            down();
-        }else if(head.direction==up){
-            up();
+    }
+
+ 
+    for (int i = 0; i < FOOD_SIZE; i++) {
+        mvprintw(food.y, food.x + i, "F");
+    }
+
+
+    if (specialFoodTimer > 0) {
+        for (int i = 0; i < SPECIAL_FOOD_SIZE; i++) {
+            mvprintw(specialFood.y, specialFood.x + i, "M");
         }
-        exitgame();
+        specialFoodTimer--;
+    } else {
+        generateSpecialFood();
     }
-    while(!kbhit());
-    a=getch();
 
-    if(a==27){
-        system("cls");
-        exit(0);
-    }
-    key=getch();
-    if((key == right && head.direction != left && head.direction !=right)key == left && head.direction != right && head.direction != left)if((key==RIGHT&&head.direction!=LEFT&&head.direction!=RIGHT)||(key==LEFT&&head.direction!=RIGHT&&head.direction!=LEFT)||(key==UP&&head.direction!=DOWN&&head.direction!=UP)||(key==DOWN&&head.direction!=UP&&head.direction!=DOWN)){
-        bend_no++;
-        bend[bend_no]=head;
-        head.direction=key;
 
-        if(key==up){
-            head.y--;
-        }if(key==down){
-            head.y++;
-        }if(key==right){
-            head.x++;
-        }if(key==left){
-            head.x--;
+    for (int i = 0; i < length; i++) {
+        for (int j = 0; j < SNAKE_SIZE; j++) {
+            if (i == 0) {
+                mvprintw(body[i].y, body[i].x + j, "O");
+            } else {
+                mvprintw(body[i].y, body[i].x + j, "-");
+            }
         }
-        move();
     }
-    else if(key==27){
-        system("cls");
-        exit(0);
-    }
-    else {
-        printf("\a");
 
-        move();
-    }
+ 
+    mvprintw(0, COLS / 2 - 5, "Score: %d", score);
+    mvprintw(0, COLS / 2 + 5, "Life: %d", life);
+
+    refresh(); 
 }
 
-void gotoxy(int x,int y){
-    COORD coord;
-    coord.x=x;
-    coord.y=y;
-SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE),coord);
-
-}
-
-void gotoXY(int x,int y){
-    HANDLE a;
-    COORD b;
-    fflush(stdout);
-    b.X =x;
-    b.Y =y;
-    a =GetStdHandle(STD_OUTPUT_HANDLE);
-    setConsoleCursorPosition(a,b);
-}
-
-void load(){
-    int row,col,r,c,q;
-
-    gotoxy(36,14);
-
-    printf("loading...");
-
-    gotoxy(30,15);
-
-    for(r=1;r<=20;r++){
-        for(q=0;q<=100000000;q++){
-            printf("%c",177);
-        }       
-    }
-getch();
-}
-
-void down(){
-    for(int i=0;i<=head.y-bend[bend_no].y&&len<length;i++){
-        gotoXY(head.x,head.y-i);
-        if(len=0){
-            printf("v");
-        }else {
-            printf("*");
-        }
-        body[len].x = head.x;
-        body[len].y = head.y-i;
-        len++;
-    }
-    bend();
-    if(!kbhit())){
-        head.y++;
-    }
-}
-
-void delay(){
-    score();
-    long double i;
-    for(i=0;i<=10000000;i++){
-
-    }
-}
-
-void i,exitgame(){
-    int check=0;
-    for(i=4;i<length;i++){
-        if(body[0].x=body[i].x&&body[0].y==body[i].y){
-           check++;
-        }
-      if(i=length||check!=0){
-        break;
-      }      
-    }
-    if(head.x<=10||head.x=>70||head.y<=10||head.y=>30||check!=0){
-        life--;
-        if(life=>0){
-            head.x=25;
-            head.y=20;
-            bend_no=0;
-            head.direction=right;
-            move();
-
-        }
-        else {
-            system("cls");
-            printf("you are out of life \n better luck next time!!!\n press any key to quit the game \n");
-            record();
+void input() {
+    int key = getch();
+    switch (key) {
+        case UP_KEY:
+        case W_KEY:
+            if (directionY == 0) { 
+                directionX = 0;
+                directionY = -1;
+            }
+            break;
+        case DOWN_KEY:
+        case S_KEY:
+            if (directionY == 0) {
+                directionX = 0;
+                directionY = 1;
+            }
+            break;
+        case RIGHT_KEY:
+        case D_KEY:
+            if (directionX == 0) { 
+                directionX = 1;
+                directionY = 0;
+            }
+            break;
+        case LEFT_KEY:
+        case A_KEY:
+            if (directionX == 0) {
+                directionX = -1;
+                directionY = 0;
+            }
+            break;
+        case ESC_KEY:
+            endwin();
             exit(0);
-        }
-    }
-
-}
-
-void food(){
-     if(head.x==food.x&&head.y==food.y){
-        length++;
-
-        time_t a;
-        a=time(0);
-        srand(a);
-        food.x=rand()%70;
-             if(food.x<=10){
-                food.x+=11;
-             }
-        food.y=rand()%30;
-             if(food.y<=10){
-                food.y+=11;
-             }
-     }
-    else if(food.x=0){
-         food.x=rand()%70;
-             if(food.x<=10){
-                food.x+=11;
-             }
-        food.y=rand()%30;
-             if(food.y<=10){
-                food.y+=11;
-             }
-     }
-}
-
-void left(){
-    for(int i=0;i<=bend[bend_no].x-head.x&&len<length;i++){
-        gotoXY((head.x+),head.y);
-        {
-            if(len==0){
-                printf("<");
-            }
-            else {
-                printf("*");
-            }
-        }
-        body[len].x=head.x+i;
-        body[len].y=head.y;
-        len++;
-    }
-    bend();
-    if(!kbhit()){
-        head.x--;
+            break;
+        default:
+            break;
     }
 }
 
-void right(){
-    for(int i=0;i<=head.x-bend[bend_no].x&&len<length;i++){
-        body[len].x=head.x-i;
-        body[len].y=head.y;
-        gotoXY(body[len].x,body[len].y);
-        {
-            if(len==0){
-                printf(">");
-            }
-            else {
-                printf("*");
-            }
-        }
-     len++;   
+void logic() {
+    
+    if (head.x == food.x && head.y == food.y) {
+        score++;
+        generateFood();
+        length += SNAKE_SIZE;
     }
-    bend();
-    if(!kbhit()){
-        head.x++;
-    }
-}
-
-void bend(){
-    int diff;
-    for(int i=bend_no;i=>0&&len<length;i++){
-        if(bend[i].x==bend[i-1].x){
-            diff=bend[i].y-bend[i-1].y;
-            if(diff<0){
-                for(int j=1;j<=(-diff);j++){
-                    body[len].x=bend[i].x;
-                    body[len].y=bend[i].y+j;
-                    gotoXY(body[len].x,body[len].y);
-                    print("f");
-                    len++;
-                    if(len==length){
-                        break;
-                    }
-                }
-            }
-                else if(diff>0){
-                    for(int j=1;j<=diff;j++){
-                        body[len].x=bend[i].x;
-                        body[len].y=bend[i].y-j;
-                        gotoXY(body[len].x,body[len].y);
-                        printf("*");
-                        len++;
-                        if(len==length){
-                            break;
-                    }
-                }
-            }                
-        }
-        else if(bend[i].y==bend[i-1].y){
-        diff=bend[i].x-bend[i-1].x;
-        if(diff<0){
-            for(int j=1;j<=(-diff)&&len<length;j++){
-                body[len].x=bend[i].x+j;
-                body[len].y=bend[i].y;
-                gotoXY(body[len].x,body[len].y);
-                printf("*");
-                len++;
-                if(len==length){
-                    break;
-                }
-            }
-        }else if(diff>0){
-            for(int j=1;j<=diff&&len<length;j++){
-                body[len].x=bend[i].x-j;
-                body[len].y=bend[i].y;
-                gotoXY(body[len].x,body[len].y);
-                printf("*");
-                len++;
-                if(len==length){
-                    break;
-                }
-
-            }
-        }
-        }
-    }
-}
-
-void boarder(){
-    system("cls");
-    gotoXY(food.x,food,y);
-    printf("F");
-    for(int i=10;i<71;i++){
-        gotoXY(i,10);
-        printf("!");
-        gotoXY(i,30);
-        printf("!");
-
-    }
-    for(int i=10;i<31;i++){
-        gotoXY(10,i);
-        printf("!");
-        gotoXY(70,i);
-        printf("!");
-    }
-}
-
-void print(){
-    printf("welcome to snake game .(press any key to continue) \n ");
-    getch();
-    system("cls");
-    printf("\t game instructions: \n");
-    printf("\n use arrow keys to move.\nyou have 3 life.every time you eat food your length will be increase \n \n you can pause game by holding a key and you can unpause by holding a key again\n if you want exit hold esc key \n");
-    printf("\n\n press any key to play..");
-    if(getch()=27){
-        exit(0);
-    }    
-}
-
-void record(){
-    char plname[20],nplname[20],cha,c;
-    int i,j,px;
-    FILE info;
-    info=fopen("record.txt","a+");
-    getch();
-    system("cls");
-    printf("Enter your name\n");
-    scanf("%[^\n]",plname);    
-    for(j=0; plname[j]!='\0'; j++) {  
-        nplname[0]=toupper(plname[0]);
-        if(plname[j-1]==' '){      
-            nplname[j]=toupper(plname[j]);
-
-            nplname[j-1]=plname[j-1];
-
-        }
-
-        else nplname[j]=plname[j];
-
-    }
-
-    nplname[j]='\0';
-    fprintf(info,"Player Name :%s\n",nplname);
 
     
-    timet mytime;
+    if (head.x == specialFood.x && head.y == specialFood.y) {
+        score += 5; 
+        specialFoodTimer = 0; 
+    }
 
-    mytime = time(NULL);
 
-    fprintf(info,"Played Date:%s",ctime(&mytime));
+    head.x += directionX;
+    head.y += directionY;
 
 
-    fprintf(info,"Score:%d\n",px=Scoreonly());
-  
-    for(i=0; i<=50; i++)
-
-        fprintf(info,"%c",'');
-
-    fprintf(info,"\n");
-
-    fclose(info);
-
-    printf("Wanna see past records press 'y'\n");
-
-    cha=getch();
-
-    system("cls");
-
-    if(cha=='y')
-
-    {
-        info=fopen("record.txt","r");
-
-        do
-        {
-
-            putchar(c=getc(info));
-
+    if (head.x <= 0 || head.x >= COLS - 1 || head.y <= 0 || head.y >= LINES - 1) {
+        gameover();
+    }
+    for (int i = 1; i < length; i++) {
+        if (head.x == body[i].x && head.y == body[i].y) {
+            gameover();
         }
-        while(c!=EOF);
+    }
 
+ 
+    for (int i = length - 1; i > 0; i--) {
+        body[i] = body[i - 1];
+    }
+    for (int i = 0; i < SNAKE_SIZE; i++) {
+        body[0].x = head.x + i;
+        body[0].y = head.y;
+    }
+}
+
+void generateFood() {
+    srand(time(NULL));
+    food.x = rand() % (COLS - FOOD_SIZE - 2) + 1; 
+    food.y = rand() % (LINES - 3) + 1; 
+}
+
+void generateSpecialFood() {
+    srand(time(NULL));
+    specialFood.x = rand() % (COLS - SPECIAL_FOOD_SIZE - 2) + 1; 
+    specialFood.y = rand() % (LINES - 3) + 1;
+    specialFoodTimer = 100; 
+}
+
+void gameover() {
+    clear();
+    mvprintw(LINES / 2, COLS / 2 - 5, "Game Over!");
+    refresh();
+    record();
+    showTopRecords();
+    endwin();
+    exit(0);
+}
+
+void record() {
+    char playerName[20], capitalizedName[20];
+
+    FILE *info = fopen("records.txt", "a+");
+    if (info == NULL) {
+        printf("Error opening records file.\n");
+        return;
+    }
+
+    int j;  
+
+    printf("Enter your name: ");
+    scanf("%19s", playerName);
+
+    for (j = 0; playerName[j] != '\0'; j++) {
+        capitalizedName[0] = toupper(playerName[0]);
+        if (playerName[j - 1] == ' ') {
+            capitalizedName[j] = toupper(playerName[j]);
+            capitalizedName[j - 1] = playerName[j - 1];
+        } else {
+            capitalizedName[j] = playerName[j];
+        }
+    }
+    capitalizedName[j] = '\0';
+
+    fprintf(info, "Player Name: %s\n", capitalizedName);
+    time_t mytime;
+    mytime = time(NULL);
+    fprintf(info, "Played Date: %s", ctime(&mytime));
+    fprintf(info, "Score: %d\n", score);
+    fprintf(info, "\n");
+    fclose(info);
+}
+
+void showTopRecords() {
+    struct Record {
+        char name[20];
+        int score;
+    };
+
+    int count;
+    FILE *info = fopen("records.txt", "r");
+    if (info == NULL) {
+        printf("Error opening records file.\n");
+        return;
+    }
+
+    fseek(info, 0, SEEK_END);
+    count = ftell(info) / sizeof(struct Record);
+    rewind(info);
+
+    struct Record *records = malloc(count * sizeof(struct Record));
+    if (records == NULL) {
+        printf("Memory allocation error.\n");
+        fclose(info);
+        return;
+    }
+
+    for (int i = 0; i < count; i++) {
+        fscanf(info, "Player Name: %s", records[i].name);
+        fscanf(info, "Played Date: %*[^\n]\n");
+        fscanf(info, "Score: %d", &records[i].score);
+        fscanf(info, "\n");
     }
 
     fclose(info);
-}
 
-int score(){
-    int score;
-    gotoXY(20,8);
-    score=length-5;
-    printf("score : %d ",(length-5));
-    score=length-5;
-    gotoXY(50.8);
-    printf("life : %d",life);
-    return score;
-}
-
-int socreonly(){
-    int score=score();
-    system("cls");
-    return score;
-}
-
-void up(){
-    for(int i=0;i<=(bend[bend_no].y-head.y)&&len<length;i++){
-        gotoXY(head.x,head.y+1);
-        {
-            if(len==0){
-                printf("^");
-            }else {
-                printf(*);
+  
+    for (int i = 0; i < count - 1; i++) {
+        for (int j = 0; j < count - i - 1; j++) {
+            if (records[j].score < records[j + 1].score) {
+                struct Record temp = records[j];
+                records[j] = records[j + 1];
+                records[j + 1] = temp;
             }
         }
-        body[len].x=head.x;
-        body[len].y=head.y+1;
-        len++;
     }
-    bend();
-    if(!kbhit()){
-      head.y--;
+
+    printf("\nTop Player Records:\n");
+    printf("Rank\tPlayer Name\tScore\n");
+
+    for (int i = 0; i < count; i++) {
+        printf("%d\t%s\t\t%d\n", i + 1, records[i].name, records[i].score);
     }
+
+    free(records);
 }
+
 ```
 
 #snakegame.cpp
@@ -494,3 +335,88 @@ void up(){
 
 
 #snakegame.py
+```python
+import curses
+from random import randint
+from time import sleep
+
+
+stdscr = curses.initscr()
+curses.curs_set(0)
+sh, sw = stdscr.getmaxyx()
+w = curses.newwin(sh, sw, 0, 0)
+w.keypad(1)
+w.timeout(100)
+
+
+snake = [[4, 4], [4, 3], [4, 2]]
+snake_dir = 0  
+
+#  food
+food = [sh // 2, sw // 2]
+w.addch(food[0], food[1], curses.ACS_PI)
+
+# Game logic
+score = 0
+while True:
+   
+    key = w.getch()
+
+    
+    if key in [curses.KEY_RIGHT, ord('d')] and snake_dir != 1:
+        snake_dir = 0
+    elif key in [curses.KEY_LEFT, ord('a')] and snake_dir != 0:
+        snake_dir = 1
+    elif key in [curses.KEY_UP, ord('w')] and snake_dir != 3:
+        snake_dir = 2
+    elif key in [curses.KEY_DOWN, ord('s')] and snake_dir != 2:
+        snake_dir = 3
+
+    # Move the snake
+    new_head = [snake[0][0], snake[0][1]]
+    if snake_dir == 0:
+        new_head[1] += 1
+    elif snake_dir == 1:
+        new_head[1] -= 1
+    elif snake_dir == 2:
+        new_head[0] -= 1
+    elif snake_dir == 3:
+        new_head[0] += 1
+
+    snake.insert(0, new_head)
+
+    
+    if snake[0] == food:
+        score += 1
+        food = None
+        while food is None:
+            nf = [
+                randint(1, sh - 1),
+                randint(1, sw - 1)
+            ]
+            food = nf if nf not in snake else None
+        w.addch(food[0], food[1], curses.ACS_PI)
+    else:
+        
+        tail = snake.pop()
+        w.addch(tail[0], tail[1], ' ')
+
+    
+    if (
+        snake[0][0] in [0, sh] or
+        snake[0][1] in [0, sw] or
+        snake[0] in snake[1:]
+    ):
+        break
+
+   
+    w.addch(snake[0][0], snake[0][1], '*')
+
+
+w.addstr(sh // 2, sw // 2, f'Game Over - Your Score: {score}', curses.A_BOLD)
+w.refresh()
+sleep(2)
+
+
+curses.endwin()
+```
