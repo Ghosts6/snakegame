@@ -680,116 +680,195 @@ void updateTopScore() {
 #snakegame.py
 ```python
 import curses
-from random import randint
-from time import sleep
+import random
+import time
 
-def main(stdscr):
-    curses.curs_set(0)
-    sh, sw = stdscr.getmaxyx()
-    if sh < 5 or sw < 20:
-        stdscr.addstr(0, 0, "Terminal size too small. Please resize and try again.")
-        stdscr.refresh()
-        stdscr.getch()
-        return
 
-    w = curses.newwin(sh, sw, 0, 0)
-    w.keypad(1)
-    w.timeout(100)
+W_KEY = 119
+A_KEY = 97
+S_KEY = 115
+D_KEY = 100
+ESC_KEY = 27
+
+
+class Coordinate:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+head = Coordinate(10, 10)
+body = [Coordinate(head.x - i, head.y) for i in range(15)]
+food = [Coordinate(random.randint(1, 38), random.randint(1, 18)) for _ in range(3)]
+special_food = [Coordinate(random.randint(1, 38), random.randint(1, 18)) for _ in range(2)]
+length = 15
+life = 3
+score = 0
+special_food_timer = 0
+top_score = 0
+direction_x = 1
+direction_y = 0
+
+def setup():
+    curses.initscr()
+    curses.curs_set(0) 
+    curses.noecho()
+    curses.cbreak()
+    curses.start_color()
+    win = curses.newwin(curses.LINES, curses.COLS)
+    win.keypad(True)
+    win.timeout(100)  
+    return win
+
+def draw(win):
+    global special_food_timer
+    win.clear()
+
+    for i in range(curses.COLS):  
+        win.addch(0, i, '-')
+        win.addch(curses.LINES-2, i, '-')  
+
+    for i in range(1, curses.LINES-2): 
+        win.addch(i, 0, '|')
+        win.addch(i, curses.COLS-1, '|')
+
+    for f in food:
+        win.addch(f.y, f.x, 'F')
+
+    if special_food_timer > 0:
+        for sf in special_food:
+            win.addch(sf.y, sf.x, 'M')
+        special_food_timer -= 1
+    else:
+        generate_special_food()
+
+    for b in body:
+        try:
+            win.addch(b.y, b.x, '-')
+        except curses.error:
+            pass
 
     try:
-        for i in range(sh):
-            w.addch(i, 0, '|')
-            w.addch(i, sw-1, '|')
-        for i in range(sw):
-            w.addch(0, i, '-')
-            w.addch(sh-1, i, '-')
+        win.addch(head.y, head.x, 'O')
+    except curses.error:
+        pass
 
-        snake = [[sh//2, sw//2-1], [sh//2, sw//2], [sh//2, sw//2+1], [sh//2, sw//2+2], [sh//2, sw//2+3]]
-        snake_dir = 0
+    win.addstr(curses.LINES-2, curses.COLS//2 - 5, f"Score: {score}") 
+    win.addstr(curses.LINES-2, curses.COLS//2 + 5, f"Life: {life}")  
+    win.addstr(curses.LINES-1, curses.COLS//2 - 5, f"Top Score: {top_score}")
 
+    win.refresh()
 
-        food = [sh // 2, sw // 2]
-        w.addch(food[0], food[1], curses.ACS_PI)
+def input_key(win):
+    global direction_x, direction_y
 
-        special_food = [sh // 2, sw // 2 + 5]
-        w.addch(special_food[0], special_food[1], ord('M'))
+    key = win.getch()  
 
+    if key == ESC_KEY:
+        curses.endwin()
+        exit()
+    elif key in [W_KEY] and direction_y == 0:
+        direction_x, direction_y = 0, -1
+    elif key in [S_KEY] and direction_y == 0:
+        direction_x, direction_y = 0, 1
+    elif key in [D_KEY] and direction_x == 0:
+        direction_x, direction_y = 1, 0
+    elif key in [A_KEY] and direction_x == 0:
+        direction_x, direction_y = -1, 0
 
-        score = 0
-        while True:
-            key = w.getch()
+def logic():
+    global head, body, length, score, special_food_timer, life, top_score
 
-            if key in [curses.KEY_RIGHT, ord('d')] and snake_dir != 1:
-                snake_dir = 0
-            elif key in [curses.KEY_LEFT, ord('a')] and snake_dir != 0:
-                snake_dir = 1
-            elif key in [curses.KEY_UP, ord('w')] and snake_dir != 3:
-                snake_dir = 2
-            elif key in [curses.KEY_DOWN, ord('s')] and snake_dir != 2:
-                snake_dir = 3
+    for f in food:
+        if head.x == f.x and head.y == f.y:
+            score += 1
 
- 
-            new_head = [snake[0][0], snake[0][1]]
-            if snake_dir == 0:
-                new_head[1] += 1
-            elif snake_dir == 1:
-                new_head[1] -= 1
-            elif snake_dir == 2:
-                new_head[0] -= 1
-            elif snake_dir == 3:
-                new_head[0] += 1
+            for _ in range(2):
+                if length < 1000:
+                    length += 5
 
-            snake.insert(0, new_head)
+            generate_food()
 
+    for sf in special_food:
+        if head.x == sf.x and head.y == sf.y:
+            score += 15
+            special_food_timer = 0
 
-            if snake[0] == food:
-                score += 1
-                food = None
-                while food is None:
-                    nf = [
-                        randint(1, sh - 2),
-                        randint(1, sw - 2)
-                    ]
-                    food = nf if nf not in snake else None
-                w.addch(food[0], food[1], curses.ACS_PI)
+    head = Coordinate(head.x + direction_x, head.y + direction_y)
 
+    if (
+        head.x <= 0
+        or head.x >= curses.COLS-1
+        or head.y <= 0
+        or head.y >= curses.LINES-2
+        or any(head.x == b.x and head.y == b.y for b in body[1:])
+    ):
+        game_over()
 
-            if snake[0] == special_food:
-                score += 5
-                special_food = None
-                while special_food is None:
-                    sf = [
-                        randint(1, sh - 2),
-                        randint(1, sw - 2)
-                    ]
-                    special_food = sf if sf not in snake and sf not in [food] else None
-                w.addch(special_food[0], special_food[1], ord('M'))
+    body.insert(0, Coordinate(head.x, head.y))
 
+    if len(body) > length:
+        body.pop()
 
-            for segment in snake:
-                if 0 < segment[0] < sh and 0 < segment[1] < sw:
-                    w.addch(segment[0], segment[1], ord('O'))
+    update_top_score()
 
-            for i in range(sh):
-                if 0 < i < sh and 0 < sw-1 < sw:
-                    w.addch(i, 0, '|')
-                    w.addch(i, sw-1, '|')
-            for i in range(sw):
-                if 0 < 0 < sh-1 and 0 < i < sw-1:
-                    w.addch(0, i, '-')
-                    w.addch(sh-1, i, '-')
+def generate_food():
+    global food
+    food = [Coordinate(random.randint(1, curses.COLS-2), random.randint(1, curses.LINES-3)) for _ in range(3)]
 
+def generate_special_food():
+    global special_food, special_food_timer
+    special_food = [Coordinate(random.randint(1, curses.COLS-2), random.randint(1, curses.LINES-3)) for _ in range(2)]
+    special_food_timer = 50
 
-            w.addstr(0, sw // 2 - 5, f'Score: {score}')
+def game_over():
+    update_top_score()
+    record()
+    show_top_records()
+    curses.endwin()
+    print(f"Game Over! Your score: {score}")
+    exit()
 
-            w.refresh()
+def record():
+    player_name = input("Enter your name: ")
+    capitalized_name = player_name.title()
 
-            sleep(0.1)
-    except curses.error as e:
-        stdscr.addstr(sh // 2, sw // 2, f"Error: {e}", curses.A_BOLD)
-        stdscr.refresh()
-        stdscr.getch()  
-if __name__ == "__main__":
-    curses.wrapper(main)
+    with open("records.txt", "a+") as info:
+        info.write(f"Player Name: {capitalized_name}\n")
+        info.write(f"Played Date: {time.ctime()}\n")
+        info.write(f"Score: {score}\n\n")
+
+def show_top_records():
+    records = []
+
+    with open("records.txt", "r") as info:
+        lines = info.readlines()
+
+    for i in range(0, len(lines), 3):
+        player_name = lines[i].split(":")[1].strip()
+        score = int(lines[i + 2].split(":")[1].strip())
+        records.append({"Player Name": player_name, "Score": score})
+
+    records.sort(key=lambda x: x["Score"], reverse=True)
+
+    print("\nTop Player Records:")
+    print("Rank\tPlayer Name\tScore")
+    for i, record in enumerate(records, start=1):
+        print(f"{i}\t{record['Player Name']}\t\t{record['Score']}")
+
+def update_top_score():
+    global top_score
+    if score > top_score:
+        top_score = score
+
+def main(win):
+    win = setup()
+
+    while True:
+        draw(win)
+        input_key(win)
+        logic()
+
+curses.wrapper(main)
+
 
 ```
