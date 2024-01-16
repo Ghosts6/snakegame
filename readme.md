@@ -1,4 +1,9 @@
-this is my source code of snake game which i create with help of c lnagugae and some common library
+#🐍snakegame:
+
+This source code of snake game that i write with language like c,c++ and python:
+
+#snakegame.c
+
 ```c
 #include <stdio.h>
 #include <stdlib.h>
@@ -482,3 +487,10 @@ void up(){
     }
 }
 ```
+
+#snakegame.cpp
+
+
+
+
+#snakegame.py
