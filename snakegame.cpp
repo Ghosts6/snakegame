@@ -1,10 +1,10 @@
-#include <curses.h>
 #include <iostream>
+#include <vector>
 #include <cstdlib>
 #include <ctime>
-#include <vector>
-#include <algorithm>
-#include <fstream>
+#include <unistd.h>
+#include <ncurses.h>
+#include <ctype.h>
 
 // Define key codes
 #define UP_KEY 65
@@ -17,12 +17,18 @@
 #define D_KEY 100
 #define ESC_KEY 27
 
-
+// Struct for direction
 struct Coordinate {
     int x, y;
 };
 
+typedef struct Coordinate Coordinate;
 
+Coordinate head, food[3], specialFood[2], body[100];
+int length, life, score, specialFoodTimer, topScore;
+int directionX, directionY;
+
+// Function prototypes
 void setup();
 void draw();
 void input();
@@ -32,13 +38,7 @@ void generateSpecialFood();
 void gameover();
 void record();
 void showTopRecords();
-
-
-WINDOW *win;
-std::vector<Coordinate> snake;
-Coordinate food, specialFood;
-int snakeDir;
-int score, specialFoodTimer;
+void updateTopScore();
 
 int main() {
     setup();
@@ -50,62 +50,73 @@ int main() {
         usleep(100000); 
     }
 
-    endwin();
+    endwin(); 
     return 0;
 }
 
 void setup() {
     initscr();            
     keypad(stdscr, TRUE); 
-    nodelay(stdscr, TRUE);
+    nodelay(stdscr, TRUE); 
     noecho();             
     curs_set(0);          
 
-    win = newwin(20, 40, 0, 0);
-    snakeDir = RIGHT_KEY;       
-    score = 0;
-    specialFoodTimer = 0;
-
- 
-    Coordinate head = {5, 5};
-    for (int i = 0; i < 5; i++) {
-        snake.push_back({head.x - i, head.y});
-    }
+    length = 15; 
+    head.x = 10;
+    head.y = 10;
+    body[0].x = head.x - length + 1;
+    body[0].y = head.y;
 
     generateFood();
     generateSpecialFood();
+    specialFoodTimer = 0;
 
-   
-    std::cout << "Game setup complete!\n";
+    life = 3;
+    score = 0;
+    topScore = 0;
+
+    directionX = 1; 
+    directionY = 0;
+
+    std::cout << "Game setup complete!" << std::endl;
 }
 
 void draw() {
     clear();
 
-    
-    box(win, 0, 0);
-    wrefresh(win);
+    for (int i = 0; i < COLS; i++) {
+        mvprintw(0, i, "-");
+        mvprintw(LINES - 1, i, "-");
+    }
+    for (int i = 1; i < LINES - 1; i++) {
+        mvprintw(i, 0, "|");
+        mvprintw(i, COLS - 1, "|");
+    }
 
-    // Draw food
-    mvprintw(food.y, food.x, "F");
+    for (int i = 0; i < 3; i++) {
+        mvprintw(food[i].y, food[i].x, "F");
+    }
 
-    
     if (specialFoodTimer > 0) {
-        mvprintw(specialFood.y, specialFood.x, "M");
+        for (int i = 0; i < 2; i++) {
+            mvprintw(specialFood[i].y, specialFood[i].x, "M");
+        }
         specialFoodTimer--;
     } else {
         generateSpecialFood();
     }
 
-    
-    for (const auto &part : snake) {
-        mvprintw(part.y, part.x, "O");
+    for (int i = 0; i < length; i++) {
+        mvprintw(body[i].y, body[i].x, "-");
     }
+    mvprintw(head.y, head.x, "O");
 
-   
-    mvprintw(0, 0, "Score: %d", score);
+    mvprintw(0, COLS / 2 - 5, "Score: %d", score);
+    mvprintw(0, COLS / 2 + 5, "Life: %d", life);
 
-    refresh(); 
+    mvprintw(LINES - 1, COLS / 2 - 5, "Top Score: %d", topScore);
+
+    refresh();
 }
 
 void input() {
@@ -113,25 +124,35 @@ void input() {
     switch (key) {
         case UP_KEY:
         case W_KEY:
-            if (snakeDir != DOWN_KEY) snakeDir = UP_KEY;
+            if (directionY == 0) {
+                directionX = 0;
+                directionY = -1;
+            }
             break;
         case DOWN_KEY:
         case S_KEY:
-            if (snakeDir != UP_KEY) snakeDir = DOWN_KEY;
+            if (directionY == 0) {
+                directionX = 0;
+                directionY = 1;
+            }
             break;
         case RIGHT_KEY:
         case D_KEY:
-            if (snakeDir != LEFT_KEY) snakeDir = RIGHT_KEY;
+            if (directionX == 0) { 
+                directionX = 1;
+                directionY = 0;
+            }
             break;
         case LEFT_KEY:
         case A_KEY:
-            if (snakeDir != RIGHT_KEY) snakeDir = LEFT_KEY;
+            if (directionX == 0) {
+                directionX = -1;
+                directionY = 0;
+            }
             break;
         case ESC_KEY:
             endwin();
-            record();
-            showTopRecords();
-            std::exit(0);
+            exit(0);
             break;
         default:
             break;
@@ -139,128 +160,162 @@ void input() {
 }
 
 void logic() {
-    
-    Coordinate newHead = snake[0];
-    switch (snakeDir) {
-        case UP_KEY:
-            newHead.y--;
-            break;
-        case DOWN_KEY:
-            newHead.y++;
-            break;
-        case RIGHT_KEY:
-            newHead.x++;
-            break;
-        case LEFT_KEY:
-            newHead.x--;
-            break;
-        default:
-            break;
+    for (int i = 0; i < 3; i++) {
+        if (head.x == food[i].x && head.y == food[i].y) {
+            score++;
+
+            for (int j = 0; j < 2; j++) {
+                if (length < 1000) {
+                    length+=5;
+                }
+            }
+
+            generateFood();
+        }
     }
 
-    
-    if (newHead.x == food.x && newHead.y == food.y) {
-        score++;
-        generateFood();
-    } else {
-        snake.pop_back(); 
+    for (int i = 0; i < 2; i++) {
+        if (head.x == specialFood[i].x && head.y == specialFood[i].y) {
+            score += 15; 
+            specialFoodTimer = 0; 
+        }
     }
 
-    
-    if (newHead.x == specialFood.x && newHead.y == specialFood.y && specialFoodTimer > 0) {
-        score += 5; 
-        specialFoodTimer = 0; 
-    }
+    head.x += directionX;
+    head.y += directionY;
 
-    
-    if (newHead.x <= 1 || newHead.x >= 38 || newHead.y <= 1 || newHead.y >= 18) {
+    if (head.x <= 0 || head.x >= COLS - 1 || head.y <= 0 || head.y >= LINES - 1) {
         gameover();
     }
-    for (const auto &part : snake) {
-        if (newHead.x == part.x && newHead.y == part.y) {
+    for (int i = 1; i < length; i++) {
+        if (head.x == body[i].x && head.y == body[i].y) {
             gameover();
         }
     }
 
-    snake.insert(snake.begin(), newHead); 
+    for (int i = length - 1; i > 0; i--) {
+        body[i] = body[i - 1];
+    }
+    body[0] = head;
+
+    updateTopScore();
 }
 
 void generateFood() {
-    srand(time(nullptr));
-    food.x = rand() % 38 + 2; 
-    food.y = rand() % 18 + 2; 
+    srand(time(NULL));
+    for (int i = 0; i < 3; i++) {
+        food[i].x = rand() % (COLS - 2) + 1; 
+        food[i].y = rand() % (LINES - 3) + 1; 
+    }
 }
 
 void generateSpecialFood() {
-    srand(time(nullptr));
-    specialFood.x = rand() % 38 + 2; 
-    specialFood.y = rand() % 18 + 2; 
-    specialFoodTimer = 100; 
+    srand(time(NULL));
+    for (int i = 0; i < 2; i++) {
+        specialFood[i].x = rand() % (COLS - 2) + 1;
+        specialFood[i].y = rand() % (LINES - 3) + 1;
+    }
+    specialFoodTimer = 50; 
 }
 
 void gameover() {
-    clear();
-    mvprintw(10, 15, "Game Over - Your Score: %d", score);
-    refresh();
+    updateTopScore();
     record();
     showTopRecords();
-    getch(); 
-    endwin();
-    std::exit(0);
+    endwin(); 
+    std::cout << "Game Over! Your score: " << score << std::endl;
+    exit(0);
 }
 
 void record() {
-    std::string playerName;
-    std::ofstream info("records.txt", std::ios::app);
-    if (!info.is_open()) {
-        std::cerr << "Error opening records file.\n";
+    char playerName[20], capitalizedName[20];
+
+    FILE *info = fopen("records.txt", "a+");
+    if (info == NULL) {
+        std::cout << "Error opening records file." << std::endl;
         return;
     }
 
+    int j;  
+
     std::cout << "Enter your name: ";
-    std::cin >> playerName;
+    scanf("%19s", playerName);
 
-    std::transform(playerName.begin(), playerName.end(), playerName.begin(), ::toupper);
+    for (j = 0; playerName[j] != '\0'; j++) {
+        capitalizedName[0] = toupper(playerName[0]);
+        if (playerName[j - 1] == ' ') {
+            capitalizedName[j] = toupper(playerName[j]);
+            capitalizedName[j - 1] = playerName[j - 1];
+        } else {
+            capitalizedName[j] = playerName[j];
+        }
+    }
+    capitalizedName[j] = '\0';
 
-    info << "Player Name: " << playerName << '\n';
+    fprintf(info, "Player Name: %s\n", capitalizedName);
     time_t mytime;
-    mytime = time(nullptr);
-    info << "Played Date: " << ctime(&mytime);
-    info << "Score: " << score << '\n';
-    info << '\n';
-    info.close();
+    mytime = time(NULL);
+    fprintf(info, "Played Date: %s", ctime(&mytime));
+    fprintf(info, "Score: %d\n", score);
+    fprintf(info, "\n");
+    fclose(info);
 }
 
 void showTopRecords() {
     struct Record {
-        std::string name;
+        char name[20];
         int score;
     };
 
-    std::ifstream info("records.txt");
-    if (!info.is_open()) {
-        std::cerr << "Error opening records file.\n";
+    int count;
+    FILE *info = fopen("records.txt", "r");
+    if (info == NULL) {
+        std::cout << "Error opening records file." << std::endl;
         return;
     }
 
-    std::vector<Record> records;
-    Record temp;
-    while (info >> temp.name >> temp.name >> temp.score) {
-        records.push_back(temp);
+    fseek(info, 0, SEEK_END);
+    count = ftell(info) / sizeof(struct Record);
+    rewind(info);
+
+    struct Record *records = (struct Record*)malloc(count * sizeof(struct Record));
+    if (records == NULL) {
+        std::cout << "Memory allocation error." << std::endl;
+        fclose(info);
+        return;
     }
 
-    info.close();
+    for (int i = 0; i < count; i++) {
+        fscanf(info, "Player Name: %s", records[i].name);
+        fscanf(info, "Played Date: %*[^\n]\n");
+        fscanf(info, "Score: %d", &records[i].score);
+        fscanf(info, "\n");
+    }
 
-   
-    std::sort(records.begin(), records.end(), [](const Record &a, const Record &b) {
-        return a.score > b.score;
-    });
+    fclose(info);
+
+    for (int i = 0; i < count - 1; i++) {
+        for (int j = 0; j < count - i - 1; j++) {
+            if (records[j].score < records[j + 1].score) {
+                struct Record temp = records[j];
+                records[j] = records[j + 1];
+                records[j + 1] = temp;
+            }
+        }
+    }
 
     std::cout << "\nTop Player Records:\n";
     std::cout << "Rank\tPlayer Name\tScore\n";
 
-    for (size_t i = 0; i < std::min(records.size(), static_cast<size_t>(5)); i++) {
-        std::cout << i + 1 << '\t' << records[i].name << '\t' << records[i].score << '\n';
+    for (int i = 0; i < count; i++) {
+        std::cout << i + 1 << "\t" << records[i].name << "\t\t" << records[i].score << std::endl;
     }
+
+    free(records);
 }
 
+void updateTopScore() {
+    if (score > topScore) {
+        topScore = score;
+    }
+}
