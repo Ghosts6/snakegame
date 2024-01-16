@@ -12,6 +12,7 @@ This source code of snake game that i write with language like c,c++ and python:
 #include <ncurses.h>
 #include <ctype.h>
 
+
 // Define key codes
 #define UP_KEY 65
 #define DOWN_KEY 66
@@ -23,11 +24,6 @@ This source code of snake game that i write with language like c,c++ and python:
 #define D_KEY 100
 #define ESC_KEY 27
 
-// Define constants
-#define SNAKE_SIZE 5 
-#define FOOD_SIZE 3
-#define SPECIAL_FOOD_SIZE 4
-
 // Struct for direction
 struct coordinate {
     int x, y;
@@ -35,11 +31,11 @@ struct coordinate {
 
 typedef struct coordinate coordinate;
 
-coordinate head, food, specialFood, body[SNAKE_SIZE * 10];
-int length, life, score, specialFoodTimer;
+coordinate head, food[3], specialFood[2], body[100];
+int length, life, score, specialFoodTimer, topScore;
 int directionX, directionY;
 
-
+// Function prototypes
 void setup();
 void draw();
 void input();
@@ -49,6 +45,7 @@ void generateSpecialFood();
 void gameover();
 void record();
 void showTopRecords();
+void updateTopScore();
 
 int main() {
     setup();
@@ -69,15 +66,13 @@ void setup() {
     keypad(stdscr, TRUE); 
     nodelay(stdscr, TRUE); 
     noecho();             
-    curs_set(0);         
+    curs_set(0);          
 
-    length = SNAKE_SIZE;
+    length = 15; 
     head.x = 10;
     head.y = 10;
-    for (int i = 0; i < SNAKE_SIZE; i++) {
-        body[i].x = head.x - i;
-        body[i].y = head.y;
-    }
+    body[0].x = head.x - length + 1;
+    body[0].y = head.y;
 
     generateFood();
     generateSpecialFood();
@@ -85,8 +80,9 @@ void setup() {
 
     life = 3;
     score = 0;
+    topScore = 0;
 
-    directionX = 1; // 
+    directionX = 1; 
     directionY = 0;
 
 
@@ -98,44 +94,41 @@ void draw() {
 
 
     for (int i = 0; i < COLS; i++) {
-        for (int j = 0; j < LINES; j++) {
-            if (i == 0 || i == COLS - 1 || j == 0 || j == LINES - 1) {
-                mvprintw(j, i, "-");
-            }
-        }
+        mvprintw(0, i, "-");
+        mvprintw(LINES - 1, i, "-");
+    }
+    for (int i = 1; i < LINES - 1; i++) {
+        mvprintw(i, 0, "|");
+        mvprintw(i, COLS - 1, "|");
     }
 
- 
-    for (int i = 0; i < FOOD_SIZE; i++) {
-        mvprintw(food.y, food.x + i, "F");
+
+    for (int i = 0; i < 3; i++) {
+        mvprintw(food[i].y, food[i].x, "F");
     }
 
 
     if (specialFoodTimer > 0) {
-        for (int i = 0; i < SPECIAL_FOOD_SIZE; i++) {
-            mvprintw(specialFood.y, specialFood.x + i, "M");
+        for (int i = 0; i < 2; i++) {
+            mvprintw(specialFood[i].y, specialFood[i].x, "M");
         }
         specialFoodTimer--;
     } else {
         generateSpecialFood();
     }
 
-
     for (int i = 0; i < length; i++) {
-        for (int j = 0; j < SNAKE_SIZE; j++) {
-            if (i == 0) {
-                mvprintw(body[i].y, body[i].x + j, "O");
-            } else {
-                mvprintw(body[i].y, body[i].x + j, "-");
-            }
-        }
+        mvprintw(body[i].y, body[i].x, "-");
     }
+    mvprintw(head.y, head.x, "O");
 
- 
+
     mvprintw(0, COLS / 2 - 5, "Score: %d", score);
     mvprintw(0, COLS / 2 + 5, "Life: %d", life);
 
-    refresh(); 
+    mvprintw(LINES - 1, COLS / 2 - 5, "Top Score: %d", topScore);
+
+    refresh();
 }
 
 void input() {
@@ -143,7 +136,7 @@ void input() {
     switch (key) {
         case UP_KEY:
         case W_KEY:
-            if (directionY == 0) { 
+            if (directionY == 0) {
                 directionX = 0;
                 directionY = -1;
             }
@@ -179,20 +172,31 @@ void input() {
 }
 
 void logic() {
-    
-    if (head.x == food.x && head.y == food.y) {
-        score++;
-        generateFood();
-        length += SNAKE_SIZE;
+
+    for (int i = 0; i < 3; i++) {
+        if (head.x == food[i].x && head.y == food[i].y) {
+            score++;
+
+
+            for (int j = 0; j < 2; j++) {
+                if (length < 1000) {
+                    length+=5;
+                }
+            }
+
+            generateFood();
+        }
     }
 
-    
-    if (head.x == specialFood.x && head.y == specialFood.y) {
-        score += 5; 
-        specialFoodTimer = 0; 
+
+    for (int i = 0; i < 2; i++) {
+        if (head.x == specialFood[i].x && head.y == specialFood[i].y) {
+            score += 15; 
+            specialFoodTimer = 0; 
+        }
     }
 
-
+ 
     head.x += directionX;
     head.y += directionY;
 
@@ -210,32 +214,36 @@ void logic() {
     for (int i = length - 1; i > 0; i--) {
         body[i] = body[i - 1];
     }
-    for (int i = 0; i < SNAKE_SIZE; i++) {
-        body[0].x = head.x + i;
-        body[0].y = head.y;
-    }
+    body[0] = head;
+
+ 
+    updateTopScore();
 }
 
 void generateFood() {
     srand(time(NULL));
-    food.x = rand() % (COLS - FOOD_SIZE - 2) + 1; 
-    food.y = rand() % (LINES - 3) + 1; 
+    for (int i = 0; i < 3; i++) {
+        food[i].x = rand() % (COLS - 2) + 1; 
+        food[i].y = rand() % (LINES - 3) + 1; 
+    }
 }
 
 void generateSpecialFood() {
     srand(time(NULL));
-    specialFood.x = rand() % (COLS - SPECIAL_FOOD_SIZE - 2) + 1; 
-    specialFood.y = rand() % (LINES - 3) + 1;
-    specialFoodTimer = 100; 
+    for (int i = 0; i < 2; i++) {
+        specialFood[i].x = rand() % (COLS - 2) + 1;
+        specialFood[i].y = rand() % (LINES - 3) + 1;
+    }
+    specialFoodTimer = 50; 
 }
 
 void gameover() {
-    clear();
-    mvprintw(LINES / 2, COLS / 2 - 5, "Game Over!");
-    refresh();
+
+    updateTopScore();
     record();
     showTopRecords();
-    endwin();
+    endwin(); 
+    printf("Game Over! Your score: %d\n", score);
     exit(0);
 }
 
@@ -326,6 +334,13 @@ void showTopRecords() {
 
     free(records);
 }
+
+void updateTopScore() {
+    if (score > topScore) {
+        topScore = score;
+    }
+}
+
 
 ```
 
