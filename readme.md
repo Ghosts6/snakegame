@@ -1,3 +1,6 @@
+![image](https://github.com/Ghosts6/snakegame/assets/95994481/8ff3bd48-b20e-4c9b-86ac-130a9f94684e)
+
+
 #🐍snakegame:
 
 ![Screenshot 2024-01-16 16:39:53](https://github.com/Ghosts6/snakegame_withc/assets/95994481/dece8de4-ea23-404f-afe4-a5ba0b4d0883)
