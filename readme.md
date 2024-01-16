@@ -1,6 +1,13 @@
 #🐍snakegame:
 
-This source code of snake game that i write with language like c,c++ and python:
+![Screenshot 2024-01-16 16:39:53](https://github.com/Ghosts6/snakegame_withc/assets/95994481/dece8de4-ea23-404f-afe4-a5ba0b4d0883)
+
+This source code of snake game that i write with language like c,c++ and python:inside game we define def for generate food and special food
+and def for draw snake and border also logic for game roll and etc...,this game also record your score and show top score at end of game 
+in terminal and file we create for this work
+
+[Screencast 2024-01-16 16:41:23.webm](https://github.com/Ghosts6/snakegame_withc/assets/95994481/b6a8679c-fe14-4e3c-99bf-a6e791a1ded9)
+
 
 #snakegame.c
 
