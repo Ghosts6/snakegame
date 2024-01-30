@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build and Run C Program
-      run: gcc snakegame.c -o snakegame -lncurses && ./snakegamec
+      run: gcc snakegame.c -o snakegame -lncurses && ./snakegame
 
     - name: Build and Run C++ Program
       run: g++ snakegame.cpp -o snakegame_cpp -lncurses && ./snakegame_cpp
