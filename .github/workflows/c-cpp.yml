@@ -14,7 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: configure
-      run: ./snakegame.cpp
+      run: chmod +x snakegame.cpp && ./snakegame.cpp
     - name: make
       run: make
     - name: make check
