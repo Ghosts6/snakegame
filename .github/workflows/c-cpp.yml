@@ -2,9 +2,9 @@ name: C/C++ CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build:
@@ -13,8 +13,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Set the TERM environment variable
+      run: echo "TERM=xterm" >> $GITHUB_ENV
+
     - name: Build and Run C Program
       run: gcc snakegame.c -o snakegame -lncurses && ./snakegame
 
     - name: Build and Run C++ Program
       run: g++ snakegame.cpp -o snakegame_cpp -lncurses && ./snakegame_cpp
+
