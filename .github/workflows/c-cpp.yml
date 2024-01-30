@@ -14,21 +14,7 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Build and Run C Program
-      run: |
-        gcc snakegame.c -o snakegame_c -lncurses
-        if [ $? -eq 0 ]; then
-          ./snakegame_c
-        else
-          echo "C Compilation failed. Exiting."
-          exit 1
-        fi
+      run: gcc snakegame.c -o snakegame_c && ./snakegame_c
 
     - name: Build and Run C++ Program
-      run: |
-        g++ snakegame.cpp -o snakegame_cpp -lncurses
-        if [ $? -eq 0 ]; then
-          ./snakegame_cpp
-        else
-          echo "C++ Compilation failed. Exiting."
-          exit 1
-        fi
+      run: g++ snakegame.cpp -o snakegame_cpp -lncurses && ./snakegame_cpp
